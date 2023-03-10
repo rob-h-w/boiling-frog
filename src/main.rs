@@ -18,14 +18,14 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-mod config;
-
-use std::cell::Cell;
-use std::rc::Rc;
-
-use gtk::glib::clone;
 use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow, Button, Orientation};
+use gtk::Orientation::{Horizontal, Vertical};
+use gtk::{Application, ApplicationWindow, Box, Frame, Label, Orientation};
+
+use crate::config::MARGIN;
+
+mod config;
+mod ui_format;
 
 const APP_ID: &str = "com.robwilliamson.boiling_frog";
 
@@ -41,50 +41,69 @@ fn main() {
 }
 
 fn build_ui(app: &Application) {
-    // Create two buttons
-    let button_increase = Button::builder()
-        .label("Increase")
-        .margin_top(12)
-        .margin_bottom(12)
-        .margin_start(12)
-        .margin_end(12)
-        .build();
-    let button_decrease = Button::builder()
-        .label("Decrease")
-        .margin_top(12)
-        .margin_bottom(12)
-        .margin_start(12)
-        .margin_end(12)
+    // Create Label
+    let temperature_title_label = set_margins!(Label::builder(), MARGIN)
+        .label("Maximum Temperature")
         .build();
 
-    // Reference-counted object with inner-mutability
-    let number = Rc::new(Cell::new(0));
+    // https://docs.gtk.org/Pango/pango_markup.html
+    let temperature_value_label = set_margins!(Label::builder(), MARGIN)
+        .use_markup(true)
+        .label("<span font_size='40000'>0C</span>")
+        .build();
 
-    // Connect callbacks
-    // When a button is clicked, `number` and label of the other button will be changed
-    button_increase.connect_clicked(clone!(@weak number, @weak button_decrease =>
-        move |_| {
-            number.set(number.get() + 1);
-            button_decrease.set_label(&number.get().to_string());
-    }));
-    button_decrease.connect_clicked(clone!(@weak button_increase =>
-        move |_| {
-            number.set(number.get() - 1);
-            button_increase.set_label(&number.get().to_string());
-    }));
-
-    // Add buttons to `gtk_box`
-    let gtk_box = gtk::Box::builder()
+    // https://docs.gtk.org/gtk4/visual_index.html
+    let temperature_grid = set_margins!(Box::builder(), MARGIN)
         .orientation(Orientation::Vertical)
         .build();
-    gtk_box.append(&button_increase);
-    gtk_box.append(&button_decrease);
+
+    temperature_grid.append(&temperature_title_label);
+    temperature_grid.append(&temperature_value_label);
+
+    let temperature_frame = set_margins!(Frame::builder(), MARGIN)
+        .child(&temperature_grid)
+        .build();
+
+    // Create Label
+    let fan_title = set_margins!(Label::builder(), MARGIN)
+        .label("Highest Fan Speed")
+        .build();
+
+    // https://docs.gtk.org/Pango/pango_markup.html
+    let fan_speed = set_margins!(Label::builder(), MARGIN)
+        .use_markup(true)
+        .label("<span font_size='40000'>0RPM</span>")
+        .build();
+
+    // https://docs.gtk.org/gtk4/visual_index.html
+    let fan_grid = set_margins!(Box::builder(), MARGIN)
+        .orientation(Vertical)
+        .build();
+
+    fan_grid.append(&fan_title);
+    fan_grid.append(&fan_speed);
+
+    let fan_frame = set_margins!(Frame::builder(), MARGIN)
+        .child(&fan_grid)
+        .build();
+
+    let metrics_grid = set_margins!(Box::builder(), MARGIN)
+        .orientation(Horizontal)
+        .build();
+
+    metrics_grid.append(&temperature_frame);
+    metrics_grid.append(&fan_frame);
+
+    // Add buttons to `gtk_box`
+    let gtk_box = Box::builder().orientation(Vertical).build();
+    gtk_box.append(&metrics_grid);
 
     // Create a window and set the title
     let window = ApplicationWindow::builder()
         .application(app)
         .title("My GTK App")
         .child(&gtk_box)
+        .resizable(false)
         .build();
 
     // Present window
