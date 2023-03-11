@@ -1,0 +1,11 @@
+[package]
+name = "boiling_frog_dbus"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+log = "0.4.17"
+zbus = "3.11.0"
+
+[lib]
+name = "boiling_frog_dbus"

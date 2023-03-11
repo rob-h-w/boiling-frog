@@ -1,8 +1,5 @@
-[package]
-name = "boiling-frog"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-glib = "0.17.2"
-gtk = { version = "0.6.2", package = "gtk4" }
+[workspace]
+members = [
+    "boiling_frog",
+    "boiling_frog_dbus"
+]
