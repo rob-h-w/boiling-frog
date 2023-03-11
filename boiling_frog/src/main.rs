@@ -21,9 +21,8 @@
 use gtk::{Application, ApplicationWindow, Box, Frame, Label, Orientation};
 use gtk::Orientation::{Horizontal, Vertical};
 use gtk::prelude::*;
-use tokio;
 
-use boiling_frog_dbus::get_temp;
+use boiling_frog_dbus::dbus_engine::DBUS_ENGINE;
 
 use crate::config::MARGIN;
 
@@ -48,11 +47,10 @@ fn build_ui(app: &Application) {
     let temperature_title_label = set_margins!(Label::builder(), MARGIN)
         .label("Maximum Temperature")
         .build();
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap();
-    let temp = rt.block_on(async { get_temp().await.unwrap() });
+
+    let mut engine = DBUS_ENGINE.lock().unwrap();
+
+    let temp = engine.temp();
 
     let temp_label_string = format!(
         "<span font_size='40000'>{}{}</span>", temp.value, temp.units);
