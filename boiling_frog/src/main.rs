@@ -18,11 +18,17 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use gtk::{Application, ApplicationWindow, Box, Frame, Label, Orientation};
-use gtk::Orientation::{Horizontal, Vertical};
-use gtk::prelude::*;
+use std::boxed;
+use std::fmt::Debug;
+use std::sync::{Arc, Mutex};
 
-use boiling_frog_dbus::dbus_engine::DBUS_ENGINE;
+use gtk::prelude::*;
+use gtk::Orientation::{Horizontal, Vertical};
+use gtk::{Application, ApplicationWindow, Box, Frame, Label, Orientation};
+
+use boiling_frog_dbus::dbus_engine::DbusEngine;
+use boiling_frog_dbus::observer::Observer;
+use boiling_frog_dbus::simple_types::Temp;
 
 use crate::config::MARGIN;
 
@@ -42,23 +48,25 @@ fn main() {
     app.run();
 }
 
+fn make_temperature_label(temp: &Temp) -> String {
+    // https://docs.gtk.org/Pango/pango_markup.html
+    format!(
+        "<span font_size='40000'>{}{}</span>",
+        temp.value, temp.units
+    )
+}
+
 fn build_ui(app: &Application) {
+    let engine = DbusEngine::default();
+
     // Create Label
     let temperature_title_label = set_margins!(Label::builder(), MARGIN)
         .label("Maximum Temperature")
         .build();
 
-    let mut engine = DBUS_ENGINE.lock().unwrap();
-
-    let temp = engine.temp();
-
-    let temp_label_string = format!(
-        "<span font_size='40000'>{}{}</span>", temp.value, temp.units);
-
-    // https://docs.gtk.org/Pango/pango_markup.html
     let temperature_value_label = set_margins!(Label::builder(), MARGIN)
         .use_markup(true)
-        .label(temp_label_string)
+        .label(make_temperature_label(&engine.temp()))
         .build();
 
     // https://docs.gtk.org/gtk4/visual_index.html
@@ -115,6 +123,36 @@ fn build_ui(app: &Application) {
         .resizable(false)
         .build();
 
+    let arc_engine = Arc::new(Mutex::new(engine));
+    let borrowed_arc_engine = arc_engine.clone();
+    let borrowed_temperature_value_label = Arc::new(Mutex::new(temperature_value_label));
+
+    arc_engine
+        .lock()
+        .unwrap()
+        .set_observer(boxed::Box::new(ActiveObject {
+            engine: borrowed_arc_engine,
+            temp_label: borrowed_temperature_value_label,
+        }));
+
     // Present window
     window.present();
+}
+
+#[derive(Debug)]
+struct ActiveObject {
+    engine: Arc<Mutex<DbusEngine>>,
+    temp_label: Arc<Mutex<Label>>,
+}
+
+unsafe impl Send for ActiveObject {}
+unsafe impl Sync for ActiveObject {}
+
+impl Observer for ActiveObject {
+    fn on_event(&self) {
+        self.temp_label
+            .lock()
+            .unwrap()
+            .set_label(&make_temperature_label(&self.engine.lock().unwrap().temp()))
+    }
 }

@@ -1,3 +1,6 @@
 pub mod dbus_engine;
-pub mod types;
+pub mod observer;
+pub mod simple_types;
 
+mod dbus_session;
+mod max_temp;
