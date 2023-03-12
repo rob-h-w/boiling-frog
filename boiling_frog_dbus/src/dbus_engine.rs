@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use crate::dbus_session::DbusSession;
 use crate::observer::Observer;
-use crate::simple_types::Temp;
+use crate::simple_types::{Fan, Temp};
 
 #[derive(Debug)]
 pub struct DbusEngine {
@@ -38,6 +38,13 @@ impl DbusEngine {
         });
 
         DbusEngine { callback, session }
+    }
+
+    pub fn fan(&self) -> Fan {
+        self.session
+            .lock()
+            .expect("Could not lock Dbus session")
+            .fan()
     }
 
     pub fn temp(&self) -> Temp {

@@ -28,7 +28,6 @@ use gtk::{Application, ApplicationWindow, Box, Frame, Label, Orientation};
 
 use boiling_frog_dbus::dbus_engine::DbusEngine;
 use boiling_frog_dbus::observer::Observer;
-use boiling_frog_dbus::simple_types::Temp;
 
 use crate::config::MARGIN;
 
@@ -48,14 +47,6 @@ fn main() {
     app.run();
 }
 
-fn make_temperature_label(temp: &Temp) -> String {
-    // https://docs.gtk.org/Pango/pango_markup.html
-    format!(
-        "<span font_size='40000'>{}{}</span>",
-        temp.value, temp.units
-    )
-}
-
 fn build_ui(app: &Application) {
     let engine = DbusEngine::default();
 
@@ -66,7 +57,7 @@ fn build_ui(app: &Application) {
 
     let temperature_value_label = set_margins!(Label::builder(), MARGIN)
         .use_markup(true)
-        .label(make_temperature_label(&engine.temp()))
+        .label(make_value_units_string!(&engine.temp()))
         .build();
 
     // https://docs.gtk.org/gtk4/visual_index.html
@@ -89,7 +80,7 @@ fn build_ui(app: &Application) {
     // https://docs.gtk.org/Pango/pango_markup.html
     let fan_speed = set_margins!(Label::builder(), MARGIN)
         .use_markup(true)
-        .label("<span font_size='40000'>0RPM</span>")
+        .label(make_value_units_string!(&engine.fan()))
         .build();
 
     // https://docs.gtk.org/gtk4/visual_index.html
@@ -125,6 +116,7 @@ fn build_ui(app: &Application) {
 
     let arc_engine = Arc::new(Mutex::new(engine));
     let borrowed_arc_engine = arc_engine.clone();
+    let borrowed_fan_value_label = Arc::new(Mutex::new(fan_speed));
     let borrowed_temperature_value_label = Arc::new(Mutex::new(temperature_value_label));
 
     arc_engine
@@ -132,6 +124,7 @@ fn build_ui(app: &Application) {
         .unwrap()
         .set_observer(boxed::Box::new(ActiveObject {
             engine: borrowed_arc_engine,
+            fan_label: borrowed_fan_value_label,
             temp_label: borrowed_temperature_value_label,
         }));
 
@@ -142,6 +135,7 @@ fn build_ui(app: &Application) {
 #[derive(Debug)]
 struct ActiveObject {
     engine: Arc<Mutex<DbusEngine>>,
+    fan_label: Arc<Mutex<Label>>,
     temp_label: Arc<Mutex<Label>>,
 }
 
@@ -150,9 +144,14 @@ unsafe impl Sync for ActiveObject {}
 
 impl Observer for ActiveObject {
     fn on_event(&self) {
+        let engine_lock = self.engine.lock().unwrap();
+        self.fan_label
+            .lock()
+            .unwrap()
+            .set_label(&make_value_units_string!(&engine_lock.fan()));
         self.temp_label
             .lock()
             .unwrap()
-            .set_label(&make_temperature_label(&self.engine.lock().unwrap().temp()))
+            .set_label(&make_value_units_string!(&engine_lock.temp()))
     }
 }
