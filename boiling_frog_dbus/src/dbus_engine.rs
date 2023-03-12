@@ -34,7 +34,7 @@ impl DbusEngine {
                     callback.as_ref().unwrap().on_event();
                 }
             }
-            sleep(Duration::from_millis(200));
+            sleep(Duration::from_millis(2000));
         });
 
         DbusEngine { callback, session }
