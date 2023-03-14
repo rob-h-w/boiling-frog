@@ -36,7 +36,7 @@ mod ui_format;
 
 const APP_ID: &str = "com.robwilliamson.boiling_frog";
 
-fn main() {
+fn main() -> glib::ExitCode {
     // Create a new application
     let app = Application::builder().application_id(APP_ID).build();
 
@@ -44,7 +44,7 @@ fn main() {
     app.connect_activate(build_ui);
 
     // Run the application
-    app.run();
+    app.run()
 }
 
 fn build_ui(app: &Application) {
