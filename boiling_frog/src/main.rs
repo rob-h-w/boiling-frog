@@ -22,9 +22,9 @@ use std::boxed;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 
-use gtk::prelude::*;
-use gtk::Orientation::{Horizontal, Vertical};
 use gtk::{Application, ApplicationWindow, Box, Frame, Label, Orientation};
+use gtk::Orientation::{Horizontal, Vertical};
+use gtk::prelude::*;
 
 use boiling_frog_dbus::dbus_engine::DbusEngine;
 use boiling_frog_dbus::observer::Observer;
@@ -48,7 +48,8 @@ fn main() -> glib::ExitCode {
 }
 
 fn build_ui(app: &Application) {
-    let engine = DbusEngine::default();
+    let engine_arc = Arc::new(Mutex::new(DbusEngine::default()));
+    let mut engine = engine_arc.lock().expect("Could not get engine");
 
     // Create Label
     let temperature_title_label = set_margins!(Label::builder(), MARGIN)
@@ -102,7 +103,6 @@ fn build_ui(app: &Application) {
     metrics_grid.append(&temperature_frame);
     metrics_grid.append(&fan_frame);
 
-    // Add buttons to `gtk_box`
     let gtk_box = Box::builder().orientation(Vertical).build();
     gtk_box.append(&metrics_grid);
 
@@ -114,18 +114,11 @@ fn build_ui(app: &Application) {
         .resizable(false)
         .build();
 
-    let arc_engine = Arc::new(Mutex::new(engine));
-    let borrowed_arc_engine = arc_engine.clone();
-    let borrowed_fan_value_label = Arc::new(Mutex::new(fan_speed));
-    let borrowed_temperature_value_label = Arc::new(Mutex::new(temperature_value_label));
-
-    arc_engine
-        .lock()
-        .unwrap()
+    engine
         .set_observer(boxed::Box::new(ActiveObject {
-            engine: borrowed_arc_engine,
-            fan_label: borrowed_fan_value_label,
-            temp_label: borrowed_temperature_value_label,
+            engine: engine_arc.clone(),
+            fan_label: Arc::new(Mutex::new(fan_speed)),
+            temp_label: Arc::new(Mutex::new(temperature_value_label)),
         }));
 
     // Present window
@@ -140,6 +133,7 @@ struct ActiveObject {
 }
 
 unsafe impl Send for ActiveObject {}
+
 unsafe impl Sync for ActiveObject {}
 
 impl Observer for ActiveObject {
