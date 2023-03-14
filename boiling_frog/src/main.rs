@@ -35,6 +35,7 @@ mod config;
 mod ui_format;
 
 const APP_ID: &str = "com.robwilliamson.boiling_frog";
+const TITLE: &str = "Boiling Frog";
 
 fn main() -> glib::ExitCode {
     // Create a new application
@@ -109,7 +110,7 @@ fn build_ui(app: &Application) {
     // Create a window and set the title
     let window = ApplicationWindow::builder()
         .application(app)
-        .title("My GTK App")
+        .title(TITLE)
         .child(&gtk_box)
         .resizable(false)
         .build();
