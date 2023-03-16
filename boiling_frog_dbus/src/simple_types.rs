@@ -7,5 +7,5 @@ pub struct Temp {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Fan {
     pub value: f64,
-    pub units: String
+    pub units: String,
 }

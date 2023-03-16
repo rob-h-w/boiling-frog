@@ -18,16 +18,14 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use std::boxed;
-use std::fmt::Debug;
-use std::sync::{Arc, Mutex};
+use glib::source::timeout_add_local;
+use std::time::Duration;
 
-use gtk::{Application, ApplicationWindow, Box, Frame, Label, Orientation};
-use gtk::Orientation::{Horizontal, Vertical};
 use gtk::prelude::*;
+use gtk::Orientation::{Horizontal, Vertical};
+use gtk::{Application, ApplicationWindow, Box, Frame, Label, Orientation};
 
 use boiling_frog_dbus::dbus_engine::DbusEngine;
-use boiling_frog_dbus::observer::Observer;
 
 use crate::config::MARGIN;
 
@@ -49,8 +47,7 @@ fn main() -> glib::ExitCode {
 }
 
 fn build_ui(app: &Application) {
-    let engine_arc = Arc::new(Mutex::new(DbusEngine::default()));
-    let mut engine = engine_arc.lock().expect("Could not get engine");
+    let engine = DbusEngine::default();
 
     // Create Label
     let temperature_title_label = set_margins!(Label::builder(), MARGIN)
@@ -112,41 +109,15 @@ fn build_ui(app: &Application) {
         .application(app)
         .title(TITLE)
         .child(&gtk_box)
-        .resizable(false)
         .build();
 
-    engine
-        .set_observer(boxed::Box::new(ActiveObject {
-            engine: engine_arc.clone(),
-            fan_label: Arc::new(Mutex::new(fan_speed)),
-            temp_label: Arc::new(Mutex::new(temperature_value_label)),
-        }));
+    // Poll the engine because GTK is not thread-safe.
+    timeout_add_local(Duration::from_millis(500), move || {
+        fan_speed.set_label(&make_value_units_string!(&engine.fan()));
+        temperature_value_label.set_label(&make_value_units_string!(&engine.temp()));
+        Continue(true)
+    });
 
     // Present window
     window.present();
-}
-
-#[derive(Debug)]
-struct ActiveObject {
-    engine: Arc<Mutex<DbusEngine>>,
-    fan_label: Arc<Mutex<Label>>,
-    temp_label: Arc<Mutex<Label>>,
-}
-
-unsafe impl Send for ActiveObject {}
-
-unsafe impl Sync for ActiveObject {}
-
-impl Observer for ActiveObject {
-    fn on_event(&self) {
-        let engine_lock = self.engine.lock().unwrap();
-        self.fan_label
-            .lock()
-            .unwrap()
-            .set_label(&make_value_units_string!(&engine_lock.fan()));
-        self.temp_label
-            .lock()
-            .unwrap()
-            .set_label(&make_value_units_string!(&engine_lock.temp()))
-    }
 }
