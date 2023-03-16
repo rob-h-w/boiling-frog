@@ -27,14 +27,14 @@ impl DbusEngine {
     pub fn fan(&self) -> Fan {
         self.session
             .lock()
-            .expect("Could not lock Dbus session")
+            .expect("Can lock Dbus session")
             .fan()
     }
 
     pub fn temp(&self) -> Temp {
         self.session
             .lock()
-            .expect("Could not lock Dbus session")
+            .expect("Can lock Dbus session")
             .temp()
     }
 }

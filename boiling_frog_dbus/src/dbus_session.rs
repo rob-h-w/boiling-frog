@@ -38,8 +38,8 @@ impl DbusSession {
     }
 
     pub(crate) fn update(&mut self) {
-        self.cached_fan = self.get_fan().expect("Could not get max fan");
-        self.cached_temp = self.get_temp().expect("Could not get max temperature");
+        self.cached_fan = self.get_fan().expect("Can get max fan");
+        self.cached_temp = self.get_temp().expect("Can get max temperature");
     }
 
     fn get_temp(&self) -> Result<Temp, Box<dyn Error + Send + Sync>> {
