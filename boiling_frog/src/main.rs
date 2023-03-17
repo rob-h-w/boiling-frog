@@ -19,15 +19,13 @@
  */
 
 use glib::source::timeout_add_local;
-use std::time::Duration;
-
-use gtk::prelude::*;
-use gtk::Orientation::{Horizontal, Vertical};
 use gtk::{Application, ApplicationWindow, Box, Frame, Label, Orientation};
+use gtk::Orientation::{Horizontal, Vertical};
+use gtk::prelude::*;
 
 use boiling_frog_dbus::dbus_engine::DbusEngine;
 
-use crate::config::MARGIN;
+use crate::config::{MARGIN, UPDATE_RATE};
 
 mod config;
 mod ui_format;
@@ -112,7 +110,7 @@ fn build_ui(app: &Application) {
         .build();
 
     // Poll the engine because GTK is not thread-safe.
-    timeout_add_local(Duration::from_millis(500), move || {
+    timeout_add_local(UPDATE_RATE, move || {
         fan_speed.set_label(&make_value_units_string!(&engine.fan()));
         temperature_value_label.set_label(&make_value_units_string!(&engine.temp()));
         Continue(true)
