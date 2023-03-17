@@ -1,6 +1,8 @@
+use std::error::Error;
 use std::sync::{Arc, Mutex};
 
 use crate::dbus_session::DbusSession;
+use crate::mutex_helpers::lock;
 use crate::simple_types::{Fan, Temp};
 
 #[derive(Debug)]
@@ -9,24 +11,18 @@ pub struct DbusEngine {
 }
 
 impl DbusEngine {
-    pub fn new() -> DbusEngine {
+    pub fn new() -> Result<DbusEngine, Box<dyn Error + Send + Sync>> {
         let session = Arc::new(Mutex::new(DbusSession::new()));
-        DbusSession::run(&session);
+        DbusSession::run(&session)?;
 
-        DbusEngine { session }
+        Ok(DbusEngine { session })
     }
 
-    pub fn fan(&self) -> Fan {
-        self.session.lock().expect("Can lock Dbus session").fan()
+    pub fn fan(&self) -> Result<Fan, Box<dyn Error + Send + Sync>> {
+        Ok(lock(&self.session)?.fan())
     }
 
-    pub fn temp(&self) -> Temp {
-        self.session.lock().expect("Can lock Dbus session").temp()
-    }
-}
-
-impl Default for DbusEngine {
-    fn default() -> Self {
-        Self::new()
+    pub fn temp(&self) -> Result<Temp, Box<dyn Error + Send + Sync>> {
+        Ok(lock(&self.session)?.temp())
     }
 }

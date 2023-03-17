@@ -21,9 +21,10 @@
 use glib::source::timeout_add_local;
 use gtk::prelude::*;
 use gtk::Orientation::{Horizontal, Vertical};
-use gtk::{Application, ApplicationWindow, Box, Frame, Label, Orientation};
+use gtk::{Application, ApplicationWindow, Box, Frame, Label, Orientation, Widget};
 
 use boiling_frog_dbus::dbus_engine::DbusEngine;
+use boiling_frog_dbus::GenericError;
 
 use crate::config::{MARGIN, UPDATE_RATE};
 
@@ -45,7 +46,38 @@ fn main() -> glib::ExitCode {
 }
 
 fn build_ui(app: &Application) {
-    let engine = DbusEngine::default();
+    // Present window
+    match build_happy_path_ui(app) {
+        Ok(window) => window.present(),
+        Err(e) => {
+            println!("{}", e.to_string());
+            build_error_path_ui(app).present()
+        }
+    }
+}
+
+fn build_error_path_ui(app: &Application) -> ApplicationWindow {
+    let grid = set_margins!(Box::builder(), MARGIN)
+        .orientation(Orientation::Vertical)
+        .build();
+    let label = set_margins!(Label::builder(), MARGIN)
+        .label("Could not receive device thermal data. Is Hardware Sensors Indicator installed?")
+        .selectable(true)
+        .build();
+    let link = set_margins!(Label::builder(), MARGIN)
+        .use_markup(true)
+        .label("<a href=\"https://github.com/alexmurray/indicator-sensors\">Hardware Sensors Indicator</a>")
+        .selectable(true)
+        .build();
+
+    grid.append(&label);
+    grid.append(&link);
+
+    make_window(app, &grid)
+}
+
+fn build_happy_path_ui(app: &Application) -> Result<ApplicationWindow, GenericError> {
+    let engine = DbusEngine::new()?;
 
     // Create Label
     let temperature_title_label = set_margins!(Label::builder(), MARGIN)
@@ -102,13 +134,6 @@ fn build_ui(app: &Application) {
     let gtk_box = Box::builder().orientation(Vertical).build();
     gtk_box.append(&metrics_grid);
 
-    // Create a window and set the title
-    let window = ApplicationWindow::builder()
-        .application(app)
-        .title(TITLE)
-        .child(&gtk_box)
-        .build();
-
     // Poll the engine because GTK is not thread-safe.
     timeout_add_local(UPDATE_RATE, move || {
         fan_speed.set_label(&make_value_units_string!(&engine.fan()));
@@ -116,6 +141,13 @@ fn build_ui(app: &Application) {
         Continue(true)
     });
 
-    // Present window
-    window.present();
+    Ok(make_window(app, &gtk_box))
+}
+
+fn make_window(app: &Application, child: &impl IsA<Widget>) -> ApplicationWindow {
+    ApplicationWindow::builder()
+        .application(app)
+        .title(TITLE)
+        .child(child)
+        .build()
 }
