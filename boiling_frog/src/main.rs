@@ -19,9 +19,9 @@
  */
 
 use glib::source::timeout_add_local;
-use gtk::{Application, ApplicationWindow, Box, Frame, Label, Orientation};
-use gtk::Orientation::{Horizontal, Vertical};
 use gtk::prelude::*;
+use gtk::Orientation::{Horizontal, Vertical};
+use gtk::{Application, ApplicationWindow, Box, Frame, Label, Orientation};
 
 use boiling_frog_dbus::dbus_engine::DbusEngine;
 
