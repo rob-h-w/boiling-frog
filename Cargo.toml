@@ -3,3 +3,6 @@ members = [
     "boiling_frog",
     "boiling_frog_dbus"
 ]
+
+[workspace.package]
+version = "0.1.0"

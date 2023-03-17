@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Boiling Frog
+Comment=Desktop app that shows the device's current thermal state.
+Exec=boiling_frog
+Icon=com.robwilliamson.boiling_frog
+StartupNotify=true
+Terminal=false
+Type=Application
+
