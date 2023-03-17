@@ -1,0 +1,2 @@
+Graphics card fan control:
+/sys/class/hwmon/hwmon4
