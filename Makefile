@@ -25,16 +25,11 @@ clean:
 	cargo clean
 
 build:
-	@echo "extra args: [ $(ARGS) ]"
-	@echo "version: $(VERSION)"
 	cargo build
 	cargo build --release
 
 install: do_install refresh
 do_install:
-	@echo "DESTDIR = $(DESTDIR)"
-	@echo "prefix = $(prefix)"
-	@echo "exec prefix = $(exec_prefix)"
 	$(INSTALL_PROGRAM) "./target/release/$(app)" "$(app_destination)"
 	$(INSTALL_DATA) "$(data_folder)/$(qualified_app).desktop" "$(desktop_destination)"
 	for i in $(icon_scales); do $(INSTALL_DATA) "$(scaled_icons)/$(qualified_app)_$${i}.png" "$(icon_destination)/$${i}/apps/$(icon_name)" ; done
