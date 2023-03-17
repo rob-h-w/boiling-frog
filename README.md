@@ -1,6 +1,6 @@
 ## Building
 
-Boiling Frog is a simple UI to display the maximum temperature and fan speed for a
+Boiling Frog is a simple Gnome UI in GTK4 to display the maximum temperature and fan speed for a
 laptop/desktop. It relies
 on [Alex Murray's Indicator Sensors](https://github.com/alexmurray/indicator-sensors) to retrieve
 the data it displays.
@@ -47,3 +47,7 @@ make uninstall
 A note on provenance: This was the product of the author suffering from Covid 19 for 2 weeks, &
 resolving to learn something about Rust and GTK4 and DBus when illness permitted. Support for
 this app is likely to be nonexistent.
+
+The reason for creating this is that it's more convenient on a multi-screen setup to run games
+on the main display and to have any performance metrics on another display. Hardware Sensors
+Indicator resides in the taskbar, so is always hidden when full-screen gaming.
