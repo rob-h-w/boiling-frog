@@ -1,14 +1,22 @@
+use std::collections::HashMap;
 use std::error::Error;
 use std::sync::{Arc, Mutex};
 use std::thread::spawn;
 
+use crate::config::{ACTIVE_SENSORS_PATH, INDICATOR_SENSORS_SERVICE};
+use crate::dbus_info::DbusInfo;
 use crate::mutex_helpers::lock;
 use log::error;
+use zbus::blocking::fdo::ObjectManagerProxy;
 use zbus::blocking::Connection;
+use zbus::names::OwnedInterfaceName;
+use zbus::zvariant::{OwnedObjectPath, OwnedValue, Str};
 use zbus::CacheProperties;
 
 use crate::max_fan::MaxFanProxyBlocking;
 use crate::max_temp::MaxTempProxyBlocking;
+use crate::metric::Metric;
+use crate::metric_value::MetricValue;
 use crate::simple_types::{Fan, Temp};
 
 macro_rules! refresh_unlocked {
@@ -93,6 +101,14 @@ impl DbusSession {
             error!("zbus signal: {e}");
             e
         })?;
+        let object_manager_proxy: ObjectManagerProxy = ObjectManagerProxy::builder(&connection)
+            .cache_properties(CacheProperties::Lazily)
+            .destination(INDICATOR_SENSORS_SERVICE)?
+            .path(ACTIVE_SENSORS_PATH)?
+            .build()?;
+        let managed_objects = object_manager_proxy.get_managed_objects()?;
+        log_out(&managed_objects);
+        let (fan_objects, temp_objects) = parse_objects(&managed_objects);
 
         let session = session_ref.clone();
 
@@ -133,5 +149,56 @@ impl DbusSession {
         refresh_unlocked!(unlocked_session, refresh_fan, fan);
         refresh_unlocked!(unlocked_session, refresh_temp, temp);
         Ok(())
+    }
+}
+
+fn parse_objects(
+    objects: &HashMap<OwnedObjectPath, HashMap<OwnedInterfaceName, HashMap<String, OwnedValue>>>,
+) -> (Vec<MetricValue>, Vec<MetricValue>) {
+    let mut fans = Vec::new();
+    let mut temps = Vec::new();
+    for (path, owned_object_path_map) in objects {
+        for (interface_name, value_map) in owned_object_path_map {
+            let dbus_info = DbusInfo::new(interface_name, path);
+            let metric_option = Metric::try_metric(&dbus_info, value_map);
+            if metric_option.is_some() {
+                match metric_option.unwrap() {
+                    Metric::Fan(metric) => fans.push(metric),
+                    Metric::Temp(metric) => temps.push(metric),
+                }
+            }
+        }
+    }
+
+    (fans, temps)
+}
+
+fn log_out(
+    objects: &HashMap<OwnedObjectPath, HashMap<OwnedInterfaceName, HashMap<String, OwnedValue>>>,
+) {
+    for (path, path_map) in objects.iter() {
+        for (iname, map) in path_map.iter() {
+            let dbus_info = DbusInfo::new(iname, path);
+            if let Some(metric) = Metric::try_metric(&dbus_info, map) {
+                println!("metric = {}", metric);
+            } else {
+                println!("could not handle {}", dbus_info);
+
+                for (value_name, owned_value) in map.iter() {
+                    if let Some(value) = &owned_value.downcast_ref::<Str>() {
+                        println!(
+                            "path = {}, interface name = {}, value_name = {}, \
+                    owned_value = {}",
+                            path, iname, value_name, value
+                        );
+                    } else {
+                        println!(
+                            "path = {}, interface name = {}, value_name = {}",
+                            path, iname, value_name
+                        );
+                    }
+                }
+            }
+        }
     }
 }
