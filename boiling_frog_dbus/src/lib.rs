@@ -13,3 +13,4 @@ mod max_fan;
 mod max_temp;
 mod metric;
 mod metric_value;
+mod sorted_property_observer;

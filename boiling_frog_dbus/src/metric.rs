@@ -8,7 +8,7 @@ use zbus::zvariant::OwnedValue;
 use crate::metric_value::MetricValue;
 use crate::GenericError;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) enum Metric {
     Fan(MetricValue),
     Temp(MetricValue),
@@ -53,6 +53,13 @@ impl Metric {
             _ => Err(Box::new(UnknownMetricUnitsError {
                 units: value.units.clone(),
             })),
+        }
+    }
+
+    pub fn get_value(&self) -> &MetricValue {
+        match self {
+            Metric::Fan(value) => value,
+            Metric::Temp(value) => value,
         }
     }
 }

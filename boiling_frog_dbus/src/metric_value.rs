@@ -14,7 +14,7 @@ macro_rules! thing_from {
     }};
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct MetricValue {
     pub dbus_info: DbusInfo,
     pub label: String,

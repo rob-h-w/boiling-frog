@@ -3,21 +3,20 @@ use std::error::Error;
 use std::sync::{Arc, Mutex};
 use std::thread::spawn;
 
-use crate::config::{ACTIVE_SENSORS_PATH, INDICATOR_SENSORS_SERVICE};
-use crate::dbus_info::DbusInfo;
-use crate::mutex_helpers::lock;
 use log::error;
 use zbus::blocking::fdo::ObjectManagerProxy;
 use zbus::blocking::Connection;
 use zbus::names::OwnedInterfaceName;
 use zbus::zvariant::{OwnedObjectPath, OwnedValue, Str};
-use zbus::CacheProperties;
 
+use crate::config::{ACTIVE_SENSORS_PATH, INDICATOR_SENSORS_SERVICE};
+use crate::dbus_info::DbusInfo;
 use crate::max_fan::MaxFanProxyBlocking;
 use crate::max_temp::MaxTempProxyBlocking;
 use crate::metric::Metric;
-use crate::metric_value::MetricValue;
+use crate::mutex_helpers::lock;
 use crate::simple_types::{Fan, Temp};
+use crate::sorted_property_observer::SortedPropertyObserver;
 
 macro_rules! refresh_unlocked {
     ($unlocked:expr, $refresh:ident, $destination:expr) => {{
@@ -102,7 +101,6 @@ impl DbusSession {
             e
         })?;
         let object_manager_proxy: ObjectManagerProxy = ObjectManagerProxy::builder(&connection)
-            .cache_properties(CacheProperties::Lazily)
             .destination(INDICATOR_SENSORS_SERVICE)?
             .path(ACTIVE_SENSORS_PATH)?
             .build()?;
@@ -110,15 +108,15 @@ impl DbusSession {
         log_out(&managed_objects);
         let (fan_objects, temp_objects) = parse_objects(&managed_objects);
 
+        let fan_observer = SortedPropertyObserver::new(session_ref, fan_objects);
+
+        let temp_observer = SortedPropertyObserver::new(session_ref, temp_objects);
+
         let session = session_ref.clone();
 
-        let temp = MaxTempProxyBlocking::builder(&connection)
-            .cache_properties(CacheProperties::Lazily)
-            .build()?;
+        let temp = MaxTempProxyBlocking::builder(&connection).build()?;
 
-        let fan = MaxFanProxyBlocking::builder(&connection)
-            .cache_properties(CacheProperties::Lazily)
-            .build()?;
+        let fan = MaxFanProxyBlocking::builder(&connection).build()?;
 
         let mut fan_changed_signal = fan.receive_value_changed();
         let mut temp_changed_signal = temp.receive_value_changed();
@@ -154,7 +152,7 @@ impl DbusSession {
 
 fn parse_objects(
     objects: &HashMap<OwnedObjectPath, HashMap<OwnedInterfaceName, HashMap<String, OwnedValue>>>,
-) -> (Vec<MetricValue>, Vec<MetricValue>) {
+) -> (Vec<Metric>, Vec<Metric>) {
     let mut fans = Vec::new();
     let mut temps = Vec::new();
     for (path, owned_object_path_map) in objects {
@@ -162,10 +160,12 @@ fn parse_objects(
             let dbus_info = DbusInfo::new(interface_name, path);
             let metric_option = Metric::try_metric(&dbus_info, value_map);
             if metric_option.is_some() {
-                match metric_option.unwrap() {
-                    Metric::Fan(metric) => fans.push(metric),
-                    Metric::Temp(metric) => temps.push(metric),
-                }
+                let metric = metric_option.unwrap();
+
+                match metric {
+                    Metric::Fan(_) => fans.push(metric.clone()),
+                    Metric::Temp(_) => temps.push(metric.clone()),
+                };
             }
         }
     }
