@@ -3,20 +3,19 @@ use std::sync::{Arc, Mutex};
 use std::thread::spawn;
 
 use log::error;
-use zbus::blocking::{Connection, PropertyIterator};
 use zbus::blocking::fdo::PropertiesProxy;
-use zbus::CacheProperties;
+use zbus::blocking::{Connection, PropertyIterator};
 use zbus::names::InterfaceName;
+use zbus::CacheProperties;
 
 use crate::config::INDICATOR_SENSORS_SERVICE;
-use crate::dbus_session::DbusSession;
-use crate::GenericError;
 use crate::metric::Metric;
 use crate::mutex_helpers::lock;
+use crate::GenericError;
 
-type Callback = Arc<Mutex<Box<dyn Fn(String, f64, String) -> Result<(), GenericError> +
-Send + Sync
-+ 'static>>>;
+type Callback = Arc<
+    Mutex<Box<dyn Fn(String, f64, String) -> Result<(), GenericError> + Send + Sync + 'static>>,
+>;
 type OptionalCallback = Option<Callback>;
 
 pub(crate) struct SortedPropertyObserverBuilder {
@@ -32,13 +31,16 @@ impl Clone for SortedPropertyObserverBuilder {
             } else {
                 None
             },
-            metrics: self.metrics.clone()
+            metrics: self.metrics.clone(),
         }
     }
 }
 
 pub(crate) fn builder() -> SortedPropertyObserverBuilder {
-    SortedPropertyObserverBuilder { callback: None, metrics: vec![] }
+    SortedPropertyObserverBuilder {
+        callback: None,
+        metrics: vec![],
+    }
 }
 
 impl SortedPropertyObserverBuilder {
@@ -51,27 +53,32 @@ impl SortedPropertyObserverBuilder {
         Ok(())
     }
 
-    pub(crate) fn with_metrics(&mut self, metrics: &Vec<Metric>) -> &mut
-    SortedPropertyObserverBuilder {
+    pub(crate) fn with_metrics(
+        &mut self,
+        metrics: &Vec<Metric>,
+    ) -> &mut SortedPropertyObserverBuilder {
         self.metrics = metrics.clone();
         self
     }
 
-    pub(crate) fn with_on_change_callback(&mut self, callback: &Callback) -> &mut
-    SortedPropertyObserverBuilder {
+    pub(crate) fn with_on_change_callback(
+        &mut self,
+        callback: &Callback,
+    ) -> &mut SortedPropertyObserverBuilder {
         self.callback = Some(callback.clone());
         self
     }
 }
 
-
-fn spawn_workers(
-    source: &SortedPropertyObserverBuilder,
-) -> Result<(), GenericError> {
+fn spawn_workers(source: &SortedPropertyObserverBuilder) -> Result<(), GenericError> {
     let state = Arc::new(Mutex::new(State {
         builder: (*source).clone(),
-        max: PropertyValue { name: "".to_string(), units: "".to_string(), value: 0.0 },
-        samples: HashMap::new()
+        max: PropertyValue {
+            name: "".to_string(),
+            units: "".to_string(),
+            value: 0.0,
+        },
+        samples: HashMap::new(),
     }));
 
     for metric in source.metrics.clone() {
@@ -98,9 +105,7 @@ fn make_property<'a, 'b: 'a>(
         .build()?)
 }
 
-fn run(metric: &Metric, state: Arc<Mutex<State>>) ->
-Result<(),
-    GenericError> {
+fn run(metric: &Metric, state: Arc<Mutex<State>>) -> Result<(), GenericError> {
     {
         let connection = Connection::session().map_err(|e| {
             error!("zbus signal: {e}");
@@ -110,10 +115,20 @@ Result<(),
         let value = metric.get_value().clone();
         let property = make_property(&connection, metric)?;
         let mut changed_signal: PropertyIterator<f64> = property.receive_property_changed("Value");
-        println!("listening for {} = {}{}", value.label.clone(), value.value, value.units);
-        update(&state, PropertyValue{name: value.label.clone(), units: value.units.clone(),
-            value: value
-            .value})?;
+        println!(
+            "listening for {} = {}{}",
+            value.label.clone(),
+            value.value,
+            value.units
+        );
+        update(
+            &state,
+            PropertyValue {
+                name: value.label.clone(),
+                units: value.units.clone(),
+                value: value.value,
+            },
+        )?;
         loop {
             let change = changed_signal.next().unwrap();
             println!(
@@ -123,17 +138,19 @@ Result<(),
                 value.units
             );
 
-            update(&state, PropertyValue{name: value.label.clone(), units: value.units.clone(),
-                value:
-                change
-                .get()
-                ?})?;
+            update(
+                &state,
+                PropertyValue {
+                    name: value.label.clone(),
+                    units: value.units.clone(),
+                    value: change.get()?,
+                },
+            )?;
         }
     }
 }
 
-fn update(state: &Arc<Mutex<State>>, property_value: PropertyValue) -> Result<(),
-    GenericError> {
+fn update(state: &Arc<Mutex<State>>, property_value: PropertyValue) -> Result<(), GenericError> {
     let mut locked_state = lock(&state)?;
     locked_state.insert(&property_value)?;
     Ok(())
@@ -154,8 +171,9 @@ struct State {
 }
 
 impl State {
-    fn insert(& mut self, property_value: &PropertyValue) -> Result<(), GenericError> {
-        self.samples.insert(property_value.name.clone(), property_value.clone());
+    fn insert(&mut self, property_value: &PropertyValue) -> Result<(), GenericError> {
+        self.samples
+            .insert(property_value.name.clone(), property_value.clone());
         let old_max = &self.max;
         let new_max = self.max();
 
@@ -173,8 +191,7 @@ impl State {
         if let Some(callback) = &self.builder.callback {
             if let Some(max) = self.max() {
                 let locked_callback = lock(&callback)?;
-                locked_callback(max.name.clone(), max.value, max.units
-                    .clone())?;
+                locked_callback(max.name.clone(), max.value, max.units.clone())?;
             }
         }
 
@@ -182,8 +199,8 @@ impl State {
     }
 
     fn max(&self) -> Option<&PropertyValue> {
-        self.samples.values().max_by(|left, right| {
-            left.value.total_cmp(&right.value)
-        })
+        self.samples
+            .values()
+            .max_by(|left, right| left.value.total_cmp(&right.value))
     }
 }

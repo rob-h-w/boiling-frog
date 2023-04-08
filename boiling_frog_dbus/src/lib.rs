@@ -9,8 +9,6 @@ mod config;
 mod dbus_info;
 mod dbus_session;
 mod error;
-mod max_fan;
-mod max_temp;
 mod metric;
 mod metric_value;
 mod sorted_property_observer;
