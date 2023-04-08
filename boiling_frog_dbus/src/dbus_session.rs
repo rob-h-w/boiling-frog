@@ -16,7 +16,7 @@ use crate::max_temp::MaxTempProxyBlocking;
 use crate::metric::Metric;
 use crate::mutex_helpers::lock;
 use crate::simple_types::{Fan, Temp};
-use crate::sorted_property_observer::SortedPropertyObserver;
+use crate::sorted_property_observer::builder;
 
 macro_rules! refresh_unlocked {
     ($unlocked:expr, $refresh:ident, $destination:expr) => {{
@@ -51,10 +51,12 @@ impl DbusSession {
     pub(crate) fn new() -> DbusSession {
         DbusSession {
             cached_fan: Fan {
+                label: "".to_string(),
                 value: 0 as f64,
                 units: "".to_string(),
             },
             cached_temp: Temp {
+                label: "".to_string(),
                 value: 0 as f64,
                 units: "".to_string(),
             },
@@ -66,6 +68,7 @@ impl DbusSession {
         proxy: &MaxTempProxyBlocking,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         self.cached_temp = Temp {
+            label: "".to_string(),
             value: proxy.value()?,
             units: proxy.units()?,
         };
@@ -78,6 +81,7 @@ impl DbusSession {
         proxy: &MaxFanProxyBlocking,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         self.cached_fan = Fan {
+            label: "".to_string(),
             value: proxy.value()?,
             units: proxy.units()?,
         };
@@ -108,32 +112,31 @@ impl DbusSession {
         log_out(&managed_objects);
         let (fan_objects, temp_objects) = parse_objects(&managed_objects);
 
-        let fan_observer = SortedPropertyObserver::new(session_ref, fan_objects);
+        let fan_callback_session = session_ref.clone();
+        builder().with_metrics(&fan_objects)
+            .and()
+            .with_on_change_callback(&Arc::new(Mutex::new(Box::new(move |label: String, value:
+            f64, units: String| {
+                let mut locked = lock(&fan_callback_session)?;
+                locked.cached_fan.label = label;
+                locked.cached_fan.units = units;
+                locked.cached_fan.value = value;
+                Ok(())
+            }))))
+            .build()?;
 
-        let temp_observer = SortedPropertyObserver::new(session_ref, temp_objects);
-
-        let session = session_ref.clone();
-
-        let temp = MaxTempProxyBlocking::builder(&connection).build()?;
-
-        let fan = MaxFanProxyBlocking::builder(&connection).build()?;
-
-        let mut fan_changed_signal = fan.receive_value_changed();
-        let mut temp_changed_signal = temp.receive_value_changed();
-
-        DbusSession::refresh(&session, &fan, &temp)?;
-
-        let fan_session = session.clone();
-
-        spawn(move || loop {
-            fan_changed_signal.next().unwrap();
-            refresh!(fan_session, refresh_fan, fan);
-        });
-
-        spawn(move || loop {
-            temp_changed_signal.next().unwrap();
-            refresh!(session, refresh_temp, temp);
-        });
+        let temp_callback_session = session_ref.clone();
+        builder().with_metrics(&temp_objects)
+            .and()
+            .with_on_change_callback(&Arc::new(Mutex::new(Box::new(move |label: String, value:
+            f64, units: String| {
+                let mut locked = lock(&temp_callback_session)?;
+                locked.cached_temp.label = label;
+                locked.cached_temp.units = units;
+                locked.cached_temp.value = value;
+                Ok(())
+            }))))
+            .build()?;
 
         Ok(())
     }
