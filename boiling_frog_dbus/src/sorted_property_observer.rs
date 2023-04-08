@@ -24,6 +24,19 @@ pub(crate) struct SortedPropertyObserverBuilder {
     metrics: Vec<Metric>,
 }
 
+impl Clone for SortedPropertyObserverBuilder {
+    fn clone(&self) -> Self {
+        SortedPropertyObserverBuilder {
+            callback: if self.callback.is_some() {
+                Some(self.callback.as_ref().unwrap().clone())
+            } else {
+                None
+            },
+            metrics: self.metrics.clone()
+        }
+    }
+}
+
 pub(crate) fn builder() -> SortedPropertyObserverBuilder {
     SortedPropertyObserverBuilder { callback: None, metrics: vec![] }
 }
@@ -53,15 +66,17 @@ impl SortedPropertyObserverBuilder {
 
 
 fn spawn_workers(
-    source: & SortedPropertyObserverBuilder,
+    source: &SortedPropertyObserverBuilder,
 ) -> Result<(), GenericError> {
+    let state = Arc::new(Mutex::new(State {
+        builder: (*source).clone(),
+        max: PropertyValue { name: "".to_string(), units: "".to_string(), value: 0.0 },
+        samples: HashMap::new()
+    }));
+
     for metric in source.metrics.clone() {
-        let callback = if source.callback.is_some() {
-            Some(source.callback.as_ref().unwrap().clone())
-        } else {
-            None
-        };
-        spawn(move || run(&metric, &callback).expect("property handler thread runs"));
+        let state_ref = state.clone();
+        spawn(move || run(&metric, state_ref).expect("property handler thread runs"));
     }
 
     Ok(())
@@ -83,7 +98,9 @@ fn make_property<'a, 'b: 'a>(
         .build()?)
 }
 
-fn run(metric: &Metric, callback: &OptionalCallback) -> Result<(), GenericError> {
+fn run(metric: &Metric, state: Arc<Mutex<State>>) ->
+Result<(),
+    GenericError> {
     {
         let connection = Connection::session().map_err(|e| {
             error!("zbus signal: {e}");
@@ -93,7 +110,10 @@ fn run(metric: &Metric, callback: &OptionalCallback) -> Result<(), GenericError>
         let value = metric.get_value().clone();
         let property = make_property(&connection, metric)?;
         let mut changed_signal: PropertyIterator<f64> = property.receive_property_changed("Value");
-        println!("listening for {}", value.label);
+        println!("listening for {} = {}{}", value.label.clone(), value.value, value.units);
+        update(&state, PropertyValue{name: value.label.clone(), units: value.units.clone(),
+            value: value
+            .value})?;
         loop {
             let change = changed_signal.next().unwrap();
             println!(
@@ -103,16 +123,67 @@ fn run(metric: &Metric, callback: &OptionalCallback) -> Result<(), GenericError>
                 value.units
             );
 
-            if let Some(c) = callback {
-                let locked = lock(&c)?;
-                locked(value.label.clone(), change.get()?, value.units.clone())?;
-            }
+            update(&state, PropertyValue{name: value.label.clone(), units: value.units.clone(),
+                value:
+                change
+                .get()
+                ?})?;
         }
     }
 }
 
-#[derive(Clone, Debug)]
-struct PropertyValue<'a> {
-    name: &'a str,
+fn update(state: &Arc<Mutex<State>>, property_value: PropertyValue) -> Result<(),
+    GenericError> {
+    let mut locked_state = lock(&state)?;
+    locked_state.insert(&property_value)?;
+    Ok(())
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct PropertyValue {
+    name: String,
+    units: String,
     value: f64,
+}
+
+#[derive(Clone)]
+struct State {
+    builder: SortedPropertyObserverBuilder,
+    max: PropertyValue,
+    samples: HashMap<String, PropertyValue>,
+}
+
+impl State {
+    fn insert(& mut self, property_value: &PropertyValue) -> Result<(), GenericError> {
+        self.samples.insert(property_value.name.clone(), property_value.clone());
+        let old_max = &self.max;
+        let new_max = self.max();
+
+        if let Some(max) = new_max {
+            if old_max != max {
+                self.max = max.clone();
+                self.call_callback()?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn call_callback(&mut self) -> Result<(), GenericError> {
+        if let Some(callback) = &self.builder.callback {
+            if let Some(max) = self.max() {
+                let locked_callback = lock(&callback)?;
+                locked_callback(max.name.clone(), max.value, max.units
+                    .clone())?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn max(&self) -> Option<&PropertyValue> {
+        self.samples.values().max_by(|left, right| {
+            left.value.total_cmp(&right.value)
+        })
+    }
 }

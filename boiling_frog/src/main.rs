@@ -136,9 +136,7 @@ fn build_happy_path_ui(app: &Application) -> Result<ApplicationWindow, GenericEr
 
     // Poll the engine because GTK is not thread-safe.
     timeout_add_local(UPDATE_RATE, move || {
-        fan_title.set_label(&engine.fan().unwrap().label);
         fan_speed.set_label(&make_value_units_string!(&engine.fan()));
-        temperature_title_label.set_label(&engine.temp().unwrap().label);
         temperature_value_label.set_label(&make_value_units_string!(&engine.temp()));
         Continue(true)
     });

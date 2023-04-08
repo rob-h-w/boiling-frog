@@ -17,8 +17,8 @@ macro_rules! make_value_units_string {
             .map(|val| {
                 // https://docs.gtk.org/Pango/pango_markup.html
                 format!(
-                    "<span font_size='40000'>{:.0}{}</span>",
-                    val.value, val.units
+                    "<span font_size='40000'>{} {:.0}{}</span>",
+                    val.label, val.value, val.units
                 )
                 .to_string()
             })
