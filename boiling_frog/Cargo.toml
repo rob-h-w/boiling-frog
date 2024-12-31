@@ -4,6 +4,6 @@ version.workspace = true
 edition = "2021"
 
 [dependencies]
-glib = "0.17.2"
-gtk = { version = "0.6.2", package = "gtk4" }
+glib = "0.20.7"
+gtk = { version = "0.9.5", package = "gtk4" }
 boiling_frog_dbus = { path = "../boiling_frog_dbus" }
