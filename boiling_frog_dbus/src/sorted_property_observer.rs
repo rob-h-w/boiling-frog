@@ -98,9 +98,9 @@ fn make_property<'a, 'b: 'a>(
     Ok(PropertiesProxy::builder(&connection)
         .cache_properties(CacheProperties::Lazily)
         .destination(INDICATOR_SENSORS_SERVICE)?
-        .path(path.as_str().clone())?
+        .path(path.as_str())?
         .interface(InterfaceName::try_from(
-            (&value).dbus_info.interface_name.as_str().clone(),
+            (&value).dbus_info.interface_name.as_str(),
         )?)?
         .build()?)
 }

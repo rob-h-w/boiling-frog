@@ -18,6 +18,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+use glib::ControlFlow::Continue;
 use glib::source::timeout_add_local;
 use gtk::prelude::*;
 use gtk::Orientation::{Horizontal, Vertical};
@@ -138,7 +139,7 @@ fn build_happy_path_ui(app: &Application) -> Result<ApplicationWindow, GenericEr
     timeout_add_local(UPDATE_RATE, move || {
         fan_speed.set_label(&make_value_units_string!(&engine.fan()));
         temperature_value_label.set_label(&make_value_units_string!(&engine.temp()));
-        Continue(true)
+        Continue
     });
 
     Ok(make_window(app, &gtk_box))
