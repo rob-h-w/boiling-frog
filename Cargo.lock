@@ -233,7 +233,7 @@ dependencies = [
 
 [[package]]
 name = "boiling_frog"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "boiling_frog_dbus",
  "glib",
@@ -242,7 +242,7 @@ dependencies = [
 
 [[package]]
 name = "boiling_frog_dbus"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "log",
  "thiserror",
