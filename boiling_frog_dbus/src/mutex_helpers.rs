@@ -7,7 +7,7 @@ pub struct LockError {
     pub msg: String,
 }
 
-pub(crate) fn lock<T>(lockable: &Arc<Mutex<T>>) -> Result<MutexGuard<T>, LockError> {
+pub(crate) fn lock<T>(lockable: &Arc<Mutex<T>>) -> Result<MutexGuard<'_, T>, LockError> {
     lockable.lock().map_err(|e| LockError {
         msg: e.to_string().clone(),
     })
